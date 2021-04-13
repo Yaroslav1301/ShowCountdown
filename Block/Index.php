@@ -19,7 +19,7 @@ class Index extends \Magento\Framework\View\Element\Template
     protected $authContext;
     protected $rule;
     public function __construct(
-        \Magento\CatalogRule\Model\ResourceModel\RuleFactory $rule,
+        \Magento\CatalogRule\Model\ResourceModel\Rule $rule,
         AuthContext $authContext,
         \Magento\Customer\Model\ResourceModel\Group\Collection $customerGroupCollection,
         RuleCollectionFactory $ruleCollectionFactory,
@@ -87,14 +87,22 @@ class Index extends \Magento\Framework\View\Element\Template
         if (!empty($catalogActiveRule)) {
             $returnDataTo = "2050-01-01";
             $returnDataFrom = "2050-01-01";
+            $product = $this->_view->getProduct();
             $allRuleIds = $catalogActiveRule->getAllIds();
             foreach ($allRuleIds as $id) {
                 $current_rule =  $catalogActiveRule->getItemById($id);
                 $to_date = $current_rule->getData('to_date');
-                $product_id = $this->_view->getProduct()->getId();
                 $website_id = 1;
-                $new_rule_factory = $this->rule->create();
-                $check_in = $new_rule_factory->getRulesFromProduct($to_date, $website_id, $groupId, $product_id);
+                $id_product = $product->getId();
+                if ($product->canConfigure()) {
+                    $arr = $this->_configurable->getChildrenIds($id_product)[0];
+                    $first_key = array_key_first($arr);
+                    $children_id = $arr[$first_key];
+                }else {
+                    $children_id = $id_product;
+                }
+
+                $check_in = $this->rule->getRulesFromProduct($to_date, $website_id, $groupId, $children_id);
                 if ($check_in) {
                     $data_from = $catalogActiveRule->getItemById($id)->getData('from_date');
                     $data_to = $catalogActiveRule->getItemById($id)->getData('to_date');
@@ -175,5 +183,23 @@ class Index extends \Magento\Framework\View\Element\Template
         }
 
         return ['right_date' => $right_date, 'right_text' => $text_event];
+    }
+
+    public function getAllCatalogRulePrices()
+    {
+        $catalogActiveRule = $this->ruleCollectionFactory->create()->addFieldToFilter('is_active', 1);
+        if (!empty($catalogActiveRule)) {
+            $arr_rules = [];
+            $allRuleIds = $catalogActiveRule->getAllIds();
+            foreach ($allRuleIds as $id) {
+                $current_rule =  $catalogActiveRule->getItemById($id);
+                $name = $current_rule->getData('name');
+                $to_date = $current_rule->getData('to_date');
+                $arr_rules [] = ['name' => $name, 'to_date' => $to_date];
+            }
+            return $arr_rules;
+        }else {
+            return false;
+        }
     }
 }
